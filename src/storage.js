@@ -75,3 +75,13 @@ export async function getLeaderboard() {
   if (error) throw new Error(error.message);
   return data;
 }
+// The logged-in user's video submissions, newest first
+// [{ id, points, submitted_at }, ...]
+export async function getMySubmissions() {
+  const { data, error } = await supabase
+    .from('submissions')
+    .select('id, points, submitted_at')
+    .order('submitted_at', { ascending: false });
+  if (error) throw new Error(error.message);
+  return data;
+}
