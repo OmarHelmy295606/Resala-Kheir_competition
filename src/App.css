@@ -627,7 +627,7 @@ form {
 
 .home-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   align-items: start;
   gap: 24px;
   max-width: 1180px;
@@ -655,13 +655,20 @@ form {
   background: linear-gradient(90deg, var(--navy), var(--gold), var(--navy));
 }
 
-.form-frame {
-  display: block;
-  width: 100%;
-  height: 900px;
-  border: 1px solid var(--border);
-  border-radius: 16px;
-  background: #f4f6fb;
+.upload-steps {
+  margin: 0 0 24px;
+  padding-left: 22px;
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--ink);
+}
+
+.upload-steps li + li {
+  margin-top: 6px;
+}
+
+.upload-button {
+  text-decoration: none;
 }
 
 .hint {

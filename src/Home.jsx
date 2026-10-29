@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { getMySubmissions } from './storage';
 import logo from './assets/logo.png';
 
@@ -6,11 +6,10 @@ const FORM_URL = import.meta.env.VITE_GOOGLE_FORM_URL;
 const USER_ID_ENTRY = import.meta.env.VITE_GOOGLE_FORM_USER_ID_ENTRY;
 
 // The form link with the user's ID already filled in
-function formLink(userId, embedded) {
+function formLink(userId) {
   const url = new URL(FORM_URL);
   url.searchParams.set('usp', 'pp_url');
   url.searchParams.set(USER_ID_ENTRY, userId);
-  if (embedded) url.searchParams.set('embedded', 'true');
   return url.toString();
 }
 
@@ -26,30 +25,28 @@ export default function Home({ user, onLogout }) {
   const [submissions, setSubmissions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const frameLoads = useRef(0);
 
-  async function loadSubmissions() {
-    setLoading(true);
-    setError('');
-    try {
-      setSubmissions(await getMySubmissions());
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
+  function loadSubmissions() {
+    getMySubmissions()
+      .then(data => {
+        setSubmissions(data);
+        setError('');
+      })
+      .catch(err => setError(err.message))
+      .finally(() => setLoading(false));
   }
 
+  function handleRefresh() {
+    setLoading(true);
+    loadSubmissions();
+  }
+
+  // Load now, and again whenever the user comes back from the form's tab
   useEffect(() => {
     loadSubmissions();
+    window.addEventListener('focus', loadSubmissions);
+    return () => window.removeEventListener('focus', loadSubmissions);
   }, []);
-
-  // The iframe loads again after the form is sent, so check for the new
-  // submission (the Apps Script needs a few seconds to save it)
-  function handleFrameLoad() {
-    frameLoads.current += 1;
-    if (frameLoads.current > 1) setTimeout(loadSubmissions, 5000);
-  }
 
   const points = submissions.reduce((sum, s) => sum + s.points, 0);
   const formReady = FORM_URL && USER_ID_ENTRY;
@@ -80,22 +77,23 @@ export default function Home({ user, onLogout }) {
 
           {formReady ? (
             <>
-              <iframe
-                className="form-frame"
-                src={formLink(user.id, true)}
-                title="Video upload form"
-                onLoad={handleFrameLoad}
+              <ol className="upload-steps">
+                <li>Click the button below. The upload form opens in a new tab.</li>
+                <li>Sign in to Google if it asks you to.</li>
+                <li>
+                  Your User ID is already filled in. Please don't change it.
+                </li>
+                <li>Choose your video and submit.</li>
+                <li>Come back to this tab. Your video appears under My submissions.</li>
+              </ol>
+              <a
+                className="primary upload-button"
+                href={formLink(user.id)}
+                target="_blank"
+                rel="noreferrer"
               >
-                Loading…
-              </iframe>
-              <p className="hint">
-                Your User ID is filled in for you, so please don't change it.
-                Upload not working?{' '}
-                <a href={formLink(user.id, false)} target="_blank" rel="noreferrer">
-                  Open the form in a new tab
-                </a>
-                .
-              </p>
+                Upload a video
+              </a>
             </>
           ) : (
             <p className="error">
@@ -108,7 +106,7 @@ export default function Home({ user, onLogout }) {
         <section className="home-card">
           <div className="section-head">
             <h2 className="section-title">My submissions</h2>
-            <button className="link-button" onClick={loadSubmissions} disabled={loading}>
+            <button className="link-button" onClick={handleRefresh} disabled={loading}>
               {loading ? 'Loading…' : 'Refresh'}
             </button>
           </div>
