@@ -671,6 +671,39 @@ form {
   text-decoration: none;
 }
 
+/* Outlined button (e.g. "Go to leaderboard") */
+.secondary-button {
+  width: 100%;
+  height: 54px;
+  margin-top: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid var(--navy);
+  border-radius: 14px;
+  background: white;
+  color: var(--navy);
+  font: inherit;
+  font-size: 16px;
+  font-weight: 800;
+  text-decoration: none;
+  cursor: pointer;
+  transition: transform 0.15s, background 0.2s, box-shadow 0.2s;
+}
+
+.secondary-button:disabled {
+  border-color: var(--border);
+  background: #f4f6fb;
+  color: var(--muted);
+  cursor: not-allowed;
+}
+
+.secondary-button:hover:not(:disabled) {
+  transform: translateY(-2px);
+  background: #f4f6fb;
+  box-shadow: 0 0 0 4px rgba(229, 196, 111, 0.28);
+}
+
 .hint {
   margin: 14px 0 0;
   font-size: 14px;

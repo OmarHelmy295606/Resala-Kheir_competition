@@ -1,6 +1,6 @@
 
 import { useCallback, useEffect, useState } from 'react';
-import { getLeaderboard } from './storage';
+import { getLeaderboard, logOut } from './storage';
 import './Leaderboard.css';
 
 export default function Leaderboard() {
@@ -26,6 +26,17 @@ export default function Leaderboard() {
   useEffect(() => {
     loadLeaderboard();
   }, [loadLeaderboard]);
+
+  // Log the person out first, so the main page shows the log-in form
+  // instead of jumping straight back to their submission page
+  async function returnToLogin(e) {
+    e.preventDefault();
+    try {
+      await logOut();
+    } finally {
+      window.location.href = '/';
+    }
+  }
 
   const ranked = [...players].sort(
     (a, b) => (Number(b.score) || 0) - (Number(a.score) || 0)
@@ -78,6 +89,12 @@ export default function Leaderboard() {
           </div>
 
           <div className="nav-actions">
+            <a className="back-to-login" href="/">
+              Go to submissions page
+            </a>
+            <a className="back-to-login" href="/" onClick={returnToLogin}>
+              ← Return to log in page
+            </a>
             <span className="season-pill">
               <span className="season-dot" /> COMPETITION LIVE
             </span>
