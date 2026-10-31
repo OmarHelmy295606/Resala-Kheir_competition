@@ -433,7 +433,7 @@ export default function Admin() {
                       <tr>
                         <td colSpan={5} style={{ textAlign: 'center', padding: '32px' }}>
                           <p style={{ margin: 0, color: 'var(--admin-muted)' }}>
-                            No competitors matching "{searchQuery}"
+                            {searchQuery ? `No competitors matching "${searchQuery}"` : 'No registered competitors yet. The board is completely clean and ready!'}
                           </p>
                         </td>
                       </tr>

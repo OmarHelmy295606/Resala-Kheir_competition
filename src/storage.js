@@ -16,6 +16,19 @@ export const supabase = isSupabaseConfigured
   ? createClient(supabaseUrl.trim().replace(/\/$/, ''), supabaseKey.trim())
   : null;
 
+// Purge any legacy mock test data cached in browser storage
+try {
+  const legacyBoard = localStorage.getItem('resala_leaderboard');
+  if (legacyBoard && (legacyBoard.includes('Nour El-Din') || legacyBoard.includes('Farida Zein') || legacyBoard.includes('1420') || legacyBoard.includes('Omar Helmy'))) {
+    localStorage.removeItem('resala_leaderboard');
+  }
+  const legacyUsers = localStorage.getItem('resala_users');
+  if (legacyUsers && (legacyUsers.includes('demo@resala.org') || legacyUsers.includes('omar@resala.org') || legacyUsers.includes('Omar Helmy'))) {
+    localStorage.removeItem('resala_users');
+    localStorage.removeItem('resala_session');
+  }
+} catch {}
+
 function getLocalUsers() {
   try {
     const raw = localStorage.getItem('resala_users');
