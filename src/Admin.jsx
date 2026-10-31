@@ -229,6 +229,16 @@ export default function Admin() {
           </div>
 
           <div className="admin-nav-actions">
+            <a
+              href="https://drive.google.com/drive/folders/1suRsXzc-Q7Fr8jnIL5vdtSve4X0tcspx"
+              target="_blank"
+              rel="noreferrer"
+              className="nav-link-btn"
+              title="Open Google Drive submissions folder"
+              style={{ color: '#3b82f6', fontWeight: 700 }}
+            >
+              📁 Google Drive Videos ↗
+            </a>
             <a href="/leaderboard" className="nav-link-btn" title="Go to public leaderboard">
               🏆 View Leaderboard
             </a>
@@ -445,6 +455,21 @@ export default function Admin() {
                                 </div>
                                 <div className="user-info">
                                   <span className="user-name">{player.username}</span>
+                                  {player.video_link && (
+                                    <a
+                                      href={player.video_link}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      style={{
+                                        fontSize: '11px',
+                                        color: '#3b82f6',
+                                        fontWeight: 600,
+                                        textDecoration: 'none',
+                                      }}
+                                    >
+                                      ▶ Watch Video ↗
+                                    </a>
+                                  )}
                                   {rank === 1 && (
                                     <span style={{ fontSize: '11px', color: 'var(--admin-gold)', fontWeight: 700 }}>
                                       CURRENT LEADER

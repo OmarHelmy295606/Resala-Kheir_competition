@@ -282,6 +282,28 @@ export async function getMySubmissions() {
   }
 }
 
+export async function getAllSubmissions() {
+  if (supabase) {
+    try {
+      const { data, error } = await supabase
+        .from('submissions')
+        .select('*')
+        .order('submitted_at', { ascending: false });
+      if (error) throw error;
+      return data || [];
+    } catch (err) {
+      console.warn('Supabase getAllSubmissions error:', err.message);
+    }
+  }
+
+  try {
+    const raw = localStorage.getItem('resala_my_submissions');
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
 export async function uploadVideoSubmission({ file, videoUrl, user }) {
   if (!user || !user.id) {
     throw new Error('You must be signed in to submit a video.');
