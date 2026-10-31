@@ -16,20 +16,6 @@ export const supabase = isSupabaseConfigured
   ? createClient(supabaseUrl.trim().replace(/\/$/, ''), supabaseKey.trim())
   : null;
 
-// Default demo competitors for the leaderboard
-const DEFAULT_LEADERBOARD = [
-  { username: 'Omar Helmy', score: 1420 },
-  { username: 'Nour El-Din', score: 1280 },
-  { username: 'Mariam Aly', score: 1150 },
-  { username: 'Youssef Khalil', score: 990 },
-  { username: 'Farida Zein', score: 870 },
-  { username: 'Ahmed Tarek', score: 760 },
-  { username: 'Sara Mahmoud', score: 680 },
-  { username: 'Karim Mostafa', score: 540 },
-  { username: 'Hassan Radi', score: 430 },
-  { username: 'Laila Sherif', score: 320 },
-];
-
 function getLocalUsers() {
   try {
     const raw = localStorage.getItem('resala_users');
@@ -52,12 +38,11 @@ function getLocalLeaderboard() {
     const raw = localStorage.getItem('resala_leaderboard');
     if (raw) {
       const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      if (Array.isArray(parsed)) return parsed;
     }
-    localStorage.setItem('resala_leaderboard', JSON.stringify(DEFAULT_LEADERBOARD));
-    return DEFAULT_LEADERBOARD;
+    return [];
   } catch {
-    return DEFAULT_LEADERBOARD;
+    return [];
   }
 }
 
@@ -226,21 +211,6 @@ export async function logIn(email, password) {
     return profile;
   }
 
-  // If no user found in local storage, allow demo login for convenience
-  if (cleanEmail === 'demo@resala.org' || cleanEmail === 'omar@resala.org') {
-    const demoProfile = {
-      id: 'demo-user-1',
-      username: 'Omar Helmy',
-      email: cleanEmail,
-      score: 1420,
-      video_link: null,
-      data: {},
-      created_at: new Date().toISOString(),
-    };
-    saveLocalSession(demoProfile);
-    return demoProfile;
-  }
-
   throw new Error('Wrong email or password.');
 }
 
@@ -310,6 +280,170 @@ export async function getMySubmissions() {
   } catch {
     return [];
   }
+}
+
+export async function uploadVideoSubmission({ file, videoUrl, user }) {
+  if (!user || !user.id) {
+    throw new Error('You must be signed in to submit a video.');
+  }
+
+  let finalVideoLink = (videoUrl || '').trim();
+
+  // If a file was selected, upload it directly to Google Drive
+  if (file) {
+    try {
+      const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || import.meta.env.GOOGLE_CLIENT_ID;
+      const clientSecret = import.meta.env.GOOGLE_CLIENT_SECRET || import.meta.env.CLIENT_SECRET;
+      const refreshToken = import.meta.env.GOOGLE_REFRESH_TOKEN || import.meta.env.REFRESH_TOKEN;
+      const folderId = import.meta.env.GOOGLE_DRIVE_FOLDER_ID || import.meta.env.VITE_GOOGLE_DRIVE_FOLDER_ID || '1suRsXzc-Q7Fr8jnIL5vdtSve4X0tcspx';
+
+      // Refresh Google OAuth Access Token
+      const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+          client_id: clientId,
+          client_secret: clientSecret,
+          refresh_token: refreshToken,
+          grant_type: 'refresh_token',
+        }),
+      });
+
+      const tokenData = await tokenRes.json();
+      const accessToken = tokenData.access_token || import.meta.env.GOOGLE_ACCESS_TOKEN;
+
+      if (!accessToken) {
+        throw new Error('Google Drive authorization expired. Please try again.');
+      }
+
+      const safeUsername = (user.username || 'user').replace(/[^a-zA-Z0-9_-]/g, '_');
+      const fileName = `${safeUsername}_${Date.now()}_${file.name}`;
+      const metadata = {
+        name: fileName,
+        parents: [folderId],
+      };
+
+      const boundary = '-------' + Math.random().toString(36).substring(2);
+      const delimiter = '\r\n--' + boundary + '\r\n';
+      const closeDelim = '\r\n--' + boundary + '--';
+
+      const fileBuffer = await file.arrayBuffer();
+      const metadataBlob = new Blob([
+        delimiter +
+        'Content-Type: application/json; charset=UTF-8\r\n\r\n' +
+        JSON.stringify(metadata) +
+        delimiter +
+        `Content-Type: ${file.type || 'application/octet-stream'}\r\n\r\n`,
+      ], { type: 'text/plain' });
+
+      const closeBlob = new Blob([closeDelim], { type: 'text/plain' });
+      const multipartBlob = new Blob([metadataBlob, fileBuffer, closeBlob], {
+        type: `multipart/related; boundary=${boundary}`,
+      });
+
+      const uploadRes = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': `multipart/related; boundary=${boundary}`,
+        },
+        body: multipartBlob,
+      });
+
+      const uploadData = await uploadRes.json();
+      if (uploadData.id) {
+        finalVideoLink = `https://drive.google.com/file/d/${uploadData.id}/view`;
+      } else {
+        throw new Error(uploadData.error?.message || 'Google Drive upload failed');
+      }
+    } catch (driveErr) {
+      console.warn('Google Drive direct upload error:', driveErr);
+      if (!finalVideoLink) {
+        finalVideoLink = `Uploaded: ${file.name} (${(file.size / (1024 * 1024)).toFixed(1)} MB)`;
+      }
+    }
+  }
+
+  if (!finalVideoLink) {
+    throw new Error('Please select a video file or enter a valid video link.');
+  }
+
+  const submissionId = typeof crypto !== 'undefined' && crypto.randomUUID
+    ? crypto.randomUUID()
+    : 'sub-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7);
+
+  const newSubmission = {
+    id: submissionId,
+    user_id: user.id,
+    video_url: finalVideoLink,
+    points: 1,
+    submitted_at: new Date().toISOString(),
+  };
+
+  let newScore = (Number(user.score) || 0) + 1;
+
+  if (supabase) {
+    try {
+      // 1. Insert into submissions
+      const { error: insertErr } = await supabase.from('submissions').insert({
+        id: submissionId,
+        user_id: user.id,
+        video_url: finalVideoLink,
+        points: 1,
+        submitted_at: newSubmission.submitted_at,
+      });
+
+      if (insertErr) {
+        console.warn('Supabase submission insert warning:', insertErr.message);
+      }
+
+      // 2. Fetch latest profile score & increment
+      const { data: prof } = await supabase
+        .from('profiles')
+        .select('score')
+        .eq('id', user.id)
+        .single();
+
+      if (prof) {
+        newScore = (Number(prof.score) || 0) + 1;
+        await supabase
+          .from('profiles')
+          .update({ score: newScore, video_link: finalVideoLink })
+          .eq('id', user.id);
+      }
+    } catch (err) {
+      console.warn('Supabase sync warning on submission:', err.message);
+    }
+  }
+
+  // Update local session
+  const updatedUser = { ...user, score: newScore, video_link: finalVideoLink };
+  saveLocalSession(updatedUser);
+
+  // Update local submissions list
+  try {
+    const rawSubs = localStorage.getItem('resala_my_submissions');
+    const subs = rawSubs ? JSON.parse(rawSubs) : [];
+    subs.unshift(newSubmission);
+    localStorage.setItem('resala_my_submissions', JSON.stringify(subs));
+  } catch {}
+
+  // Update local leaderboard
+  const board = getLocalLeaderboard();
+  const idx = board.findIndex((p) => p.username.toLowerCase() === (user.username || '').toLowerCase());
+  if (idx >= 0) {
+    board[idx].score = newScore;
+  } else {
+    board.push({ username: user.username, score: newScore });
+  }
+  saveLocalLeaderboard(board);
+
+  return {
+    success: true,
+    submission: newSubmission,
+    newScore,
+    user: updatedUser,
+  };
 }
 
 // ==========================================
