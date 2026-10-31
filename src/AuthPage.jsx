@@ -270,6 +270,24 @@ export default function AuthPage({ onAuth }) {
                   {isSignup ? 'Log in' : 'Sign up'}
                 </button>
               </p>
+
+              <div style={{ textAlign: 'center', marginTop: '16px', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '14px' }}>
+                <a
+                  href="/leaderboard"
+                  className="link-button"
+                  style={{ textDecoration: 'none', fontSize: '13px', fontWeight: 600, color: 'var(--navy)' }}
+                >
+                  View Live Leaderboard →
+                </a>
+                <span style={{ color: 'var(--muted)', fontSize: '12px' }}>•</span>
+                <a
+                  href="/admin"
+                  className="link-button"
+                  style={{ textDecoration: 'none', fontSize: '13px', fontWeight: 600, color: '#dc2626' }}
+                >
+                  Admin Portal 🛡️
+                </a>
+              </div>
             </>
           )}
         </main>

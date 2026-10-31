@@ -1,0 +1,7 @@
+{
+  "name": "Resala Kheir Competition",
+  "description": "Leaderboard and competition portal for Resala Kheir",
+  "capabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

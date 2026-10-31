@@ -7,10 +7,14 @@ const USER_ID_ENTRY = import.meta.env.VITE_GOOGLE_FORM_USER_ID_ENTRY;
 
 // The form link with the user's ID already filled in
 function formLink(userId) {
-  const url = new URL(FORM_URL);
-  url.searchParams.set('usp', 'pp_url');
-  url.searchParams.set(USER_ID_ENTRY, userId);
-  return url.toString();
+  try {
+    const url = new URL(FORM_URL);
+    url.searchParams.set('usp', 'pp_url');
+    url.searchParams.set(USER_ID_ENTRY, userId);
+    return url.toString();
+  } catch {
+    return '#';
+  }
 }
 
 function formatDate(iso) {
@@ -28,11 +32,11 @@ export default function Home({ user, onLogout }) {
 
   function loadSubmissions() {
     getMySubmissions()
-      .then(data => {
-        setSubmissions(data);
+      .then((data) => {
+        setSubmissions(Array.isArray(data) ? data : []);
         setError('');
       })
-      .catch(err => setError(err.message))
+      .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
   }
 
@@ -48,18 +52,36 @@ export default function Home({ user, onLogout }) {
     return () => window.removeEventListener('focus', loadSubmissions);
   }, []);
 
-  const points = submissions.reduce((sum, s) => sum + s.points, 0);
-  const formReady = FORM_URL && USER_ID_ENTRY;
+  const submissionPoints = submissions.reduce((sum, s) => sum + (Number(s.points) || 0), 0);
+  const displayScore = user?.score !== undefined ? user.score : submissionPoints;
+  const formReady = Boolean(FORM_URL && USER_ID_ENTRY);
 
   return (
     <div className="home-page">
       <header className="topbar">
-        <img src={logo} alt="Resala AUC" className="topbar-logo" />
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <img src={logo} alt="Resala AUC" className="topbar-logo" />
+          <span style={{ fontWeight: 700, fontSize: '15px' }}>Resala Kheir</span>
+        </div>
         <div className="topbar-user">
+          <a
+            href="/leaderboard"
+            className="link-button"
+            style={{ color: '#f3dea0', textDecoration: 'none', fontWeight: 600, fontSize: '13px' }}
+          >
+            🏆 Leaderboard
+          </a>
+          <a
+            href="/admin"
+            className="link-button"
+            style={{ color: '#fca5a5', textDecoration: 'none', fontWeight: 600, fontSize: '13px' }}
+          >
+            🛡️ Admin
+          </a>
           <span>
             Hi, <strong>{user.username}</strong>
           </span>
-          <span className="points-pill">{points} pts</span>
+          <span className="points-pill">{displayScore} pts</span>
           <button className="link-button" onClick={onLogout}>
             Log out
           </button>
@@ -81,14 +103,14 @@ export default function Home({ user, onLogout }) {
                 <li>Click the button below. The upload form opens in a new tab.</li>
                 <li>Sign in to Google if it asks you to.</li>
                 <li>
-                  Your User ID is already filled in. Please don't change it.
+                  Your username is already filled in. Please don't change it.
                 </li>
                 <li>Choose your video and submit.</li>
                 <li>Come back to this tab. Your video appears under My submissions.</li>
               </ol>
               <a
                 className="primary upload-button"
-                href={formLink(user.id)}
+                href={formLink(user.username)}
                 target="_blank"
                 rel="noreferrer"
               >
@@ -100,6 +122,24 @@ export default function Home({ user, onLogout }) {
               The upload form isn't set up yet. Add VITE_GOOGLE_FORM_URL and
               VITE_GOOGLE_FORM_USER_ID_ENTRY to .env.local.
             </p>
+          )}
+
+          {/* Only people who have uploaded at least one video can open the leaderboard */}
+          {submissions.length > 0 ? (
+            <a className="secondary-button" href="/leaderboard">
+              Go to leaderboard
+            </a>
+          ) : (
+            <>
+              <button className="secondary-button" type="button" disabled>
+                Go to leaderboard
+              </button>
+              <p className="hint">
+                {loading
+                  ? 'Checking your uploads…'
+                  : 'Upload your first video to unlock the leaderboard.'}
+              </p>
+            </>
           )}
         </section>
 
@@ -119,7 +159,7 @@ export default function Home({ user, onLogout }) {
 
           <ul className="submission-list">
             {submissions.map((s, i) => (
-              <li key={s.id} className="submission">
+              <li key={s.id || i} className="submission">
                 <div>
                   <strong>Video {submissions.length - i}</strong>
                   <span className="submission-date">{formatDate(s.submitted_at)}</span>

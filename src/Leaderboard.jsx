@@ -1,7 +1,14 @@
 
 import { useCallback, useEffect, useState } from 'react';
-import { getLeaderboard } from './storage';
+import { getLeaderboard, logOut } from './storage';
 import './Leaderboard.css';
+
+const CHALLENGES = [
+  'Your next point could change your ranking.',
+  'Consistency creates champions. Keep going.',
+  'Every contribution brings Resala Kheir forward.',
+  'The crown is earned, one point at a time.',
+];
 
 export default function Leaderboard() {
   const [players, setPlayers] = useState([]);
@@ -24,8 +31,34 @@ export default function Leaderboard() {
   }, []);
 
   useEffect(() => {
-    loadLeaderboard();
-  }, [loadLeaderboard]);
+    let isMounted = true;
+    getLeaderboard()
+      .then((data) => {
+        if (isMounted) {
+          setPlayers(Array.isArray(data) ? data : []);
+          setLoading(false);
+        }
+      })
+      .catch((err) => {
+        if (isMounted) {
+          setError(err.message || 'Could not load the leaderboard.');
+          setLoading(false);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  async function returnToLogin(e) {
+    e.preventDefault();
+    try {
+      await logOut();
+    } finally {
+      window.location.href = '/';
+    }
+  }
 
   const ranked = [...players].sort(
     (a, b) => (Number(b.score) || 0) - (Number(a.score) || 0)
@@ -45,18 +78,11 @@ export default function Leaderboard() {
     { player: ranked[2], rank: 3, medal: '🥉', tier: 'bronze' },
   ];
 
-  const challenges = [
-    'Your next point could change your ranking.',
-    'Consistency creates champions. Keep going.',
-    'Every contribution brings Resala Kheir forward.',
-    'The crown is earned, one point at a time.',
-  ];
-
   const [challengeIndex, setChallengeIndex] = useState(0);
 
   useEffect(() => {
     const interval = setInterval(() => {
-      setChallengeIndex((index) => (index + 1) % challenges.length);
+      setChallengeIndex((index) => (index + 1) % CHALLENGES.length);
     }, 5000);
 
     return () => clearInterval(interval);
@@ -78,6 +104,20 @@ export default function Leaderboard() {
           </div>
 
           <div className="nav-actions">
+            <a className="back-to-login" href="/">
+              Go to submissions page
+            </a>
+            <a className="back-to-login" href="/" onClick={returnToLogin}>
+              ← Return to log in page
+            </a>
+            <a
+              href="/admin"
+              className="season-pill"
+              style={{ textDecoration: 'none', color: '#ef4444', borderColor: 'rgba(239, 68, 68, 0.4)' }}
+              title="Administrator access to manage points and view rankings"
+            >
+              🛡️ Admin
+            </a>
             <span className="season-pill">
               <span className="season-dot" /> COMPETITION LIVE
             </span>
@@ -150,7 +190,7 @@ export default function Leaderboard() {
           <span className="ticker-star">✦</span>
           <span className="ticker-label">THE MINDSET</span>
           <span key={challengeIndex} className="ticker-message">
-            {challenges[challengeIndex]}
+            {CHALLENGES[challengeIndex]}
           </span>
         </div>
 
@@ -159,7 +199,7 @@ export default function Leaderboard() {
             <div className="empty-icon">⚠️</div>
             <h2>Rankings couldn't load</h2>
             <p>{error}</p>
-            <button className="leaderboard-refresh" onClick={loadLeaderboard} type="button">
+            <button className="leaderboard-refresh" onClick={() => loadLeaderboard(true)} type="button">
               Try again ↻
             </button>
           </section>
@@ -215,7 +255,7 @@ export default function Leaderboard() {
                 </div>
                 <button
                   className="leaderboard-refresh"
-                  onClick={loadLeaderboard}
+                  onClick={() => loadLeaderboard(true)}
                   disabled={loading}
                   type="button"
                 >
@@ -293,7 +333,7 @@ export default function Leaderboard() {
 
               <footer className="dashboard-footer">
                 <span>✦ BUILT ON KINDNESS. DRIVEN BY COMPETITION.</span>
-                <button onClick={loadLeaderboard} type="button" className="footer-update">
+                <button onClick={() => loadLeaderboard(true)} type="button" className="footer-update">
                   Update rankings ↻
                 </button>
               </footer>

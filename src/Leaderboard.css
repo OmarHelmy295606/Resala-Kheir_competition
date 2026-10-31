@@ -1203,3 +1203,36 @@
   object-fit: contain;
   flex-shrink: 0;
 }
+
+/* "Return to log in page" button in the top bar */
+.back-to-login {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 14px;
+  border: 1px solid rgb(59 130 246 / 30%);
+  border-radius: 11px;
+  background: rgb(59 130 246 / 8%);
+  color: var(--arena-blue);
+  font-size: 11px;
+  font-weight: 900;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: transform 180ms ease, background 180ms ease;
+}
+
+.back-to-login:hover {
+  transform: translateY(-2px);
+  background: rgb(59 130 246 / 16%);
+}
+
+@media (max-width: 650px) {
+  .dashboard-nav {
+    flex-wrap: wrap;
+  }
+
+  .back-to-login {
+    padding: 8px 10px;
+    font-size: 10px;
+  }
+}

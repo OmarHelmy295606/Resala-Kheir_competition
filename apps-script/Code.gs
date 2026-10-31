@@ -15,7 +15,9 @@
 
 const SHEET_NAME = 'Form Responses 1';
 const TIMESTAMP_HEADER = 'Timestamp';
-const USER_ID_HEADER = 'User ID'; // must match the form question title
+// The form question that identifies the person. It can be titled "Username"
+// or "User ID" and can hold either a username or the long account ID.
+const USER_HEADERS = ['Username', 'User ID'];
 const VIDEO_HEADER = 'Video';     // must match the form question title
 const ID_HEADER = 'Submission ID';
 const POINTS_HEADER = 'Points';
@@ -103,7 +105,7 @@ function syncRow(sheet, row, cols) {
   try {
     upsertSubmission({
       id: id,
-      user_id: String(get(USER_ID_HEADER)).trim(),
+      user_id: findUserId(String(get(userHeader(cols))).trim()),
       video_url: String(get(VIDEO_HEADER)),
       points: points,
       submitted_at: new Date(get(TIMESTAMP_HEADER)).toISOString(),
@@ -114,18 +116,46 @@ function syncRow(sheet, row, cols) {
   }
 }
 
-function upsertSubmission(body) {
+function supabaseConfig() {
   const props = PropertiesService.getScriptProperties();
   const url = props.getProperty('SUPABASE_URL');
   const key = props.getProperty('SUPABASE_SECRET_KEY');
   if (!url || !key) {
     throw new Error('Add SUPABASE_URL and SUPABASE_SECRET_KEY in Script properties');
   }
-
-  const headers = { apikey: key, Prefer: 'resolution=merge-duplicates,return=minimal' };
+  const headers = { apikey: key };
   if (key.startsWith('eyJ')) headers.Authorization = 'Bearer ' + key; // legacy service_role key
+  return { url: url.replace(/\/$/, ''), headers: headers };
+}
 
-  const res = UrlFetchApp.fetch(url.replace(/\/$/, '') + '/rest/v1/submissions?on_conflict=id', {
+// Turns what the person entered into their account ID.
+// Accepts a username (any capitalisation) or the long account ID itself.
+function findUserId(value) {
+  if (!value) throw new Error('Username is empty');
+  if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value)) {
+    return value.toLowerCase();
+  }
+
+  const cfg = supabaseConfig();
+  const res = UrlFetchApp.fetch(
+    cfg.url + '/rest/v1/profiles?select=id,username&username=ilike.' + encodeURIComponent(value),
+    { headers: cfg.headers, muteHttpExceptions: true }
+  );
+  if (res.getResponseCode() >= 300) {
+    throw new Error('Could not look up username: ' + res.getContentText());
+  }
+  // ilike treats _ and % as wildcards, so keep only an exact match
+  const match = JSON.parse(res.getContentText())
+    .find(p => String(p.username).toLowerCase() === value.toLowerCase());
+  if (!match) throw new Error('No account has the username "' + value + '"');
+  return match.id;
+}
+
+function upsertSubmission(body) {
+  const cfg = supabaseConfig();
+  const headers = Object.assign({ Prefer: 'resolution=merge-duplicates,return=minimal' }, cfg.headers);
+
+  const res = UrlFetchApp.fetch(cfg.url + '/rest/v1/submissions?on_conflict=id', {
     method: 'post',
     contentType: 'application/json',
     headers: headers,
@@ -137,7 +167,7 @@ function upsertSubmission(body) {
   let message = res.getContentText();
   try {
     const json = JSON.parse(message);
-    if (json.code === '23503') message = 'No account has this User ID';
+    if (json.code === '23503') message = 'No account has this username';
     else if (json.code === '22P02') message = 'User ID is not valid';
     else message = json.message || message;
   } catch (_) {
@@ -163,9 +193,10 @@ function headerMap(sheet) {
 // Adds our extra columns if they're missing, and checks the form ones exist
 function ensureColumns(sheet) {
   let cols = headerMap(sheet);
-  [TIMESTAMP_HEADER, USER_ID_HEADER, VIDEO_HEADER].forEach(h => {
+  [TIMESTAMP_HEADER, VIDEO_HEADER].forEach(h => {
     if (!cols[h]) throw new Error('Missing column "' + h + '" — check the form question titles');
   });
+  userHeader(cols); // throws if there's no Username / User ID column
   [ID_HEADER, POINTS_HEADER, STATUS_HEADER].forEach(h => {
     if (!cols[h]) {
       sheet.getRange(1, sheet.getLastColumn() + 1).setValue(h).setFontWeight('bold');
@@ -173,6 +204,13 @@ function ensureColumns(sheet) {
     }
   });
   return cols;
+}
+
+// Which of USER_HEADERS this sheet uses
+function userHeader(cols) {
+  const h = USER_HEADERS.find(name => cols[name]);
+  if (!h) throw new Error('Missing a "Username" or "User ID" column — check the form question titles');
+  return h;
 }
 
 function pointsRule() {
